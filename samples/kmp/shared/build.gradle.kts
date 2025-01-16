@@ -1,4 +1,5 @@
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("multiplatform")
@@ -7,10 +8,14 @@ plugins {
 }
 
 kotlin {
-    android {
+    jvmToolchain(17)
+
+    androidTarget {
         compilations.all {
-            kotlinOptions {
-                jvmTarget = "1.8"
+            compileTaskProvider.configure {
+                compilerOptions {
+                    jvmTarget.set(JvmTarget.JVM_17)
+                }
             }
         }
     }
@@ -22,7 +27,7 @@ kotlin {
         summary = "Some description for the Shared Module"
         homepage = "Link to the Shared Module homepage"
         version = "1.0"
-        ios.deploymentTarget = "14.1"
+        ios.deploymentTarget = "18"
         dependencies {
             pod("TrustWalletCore", moduleName = "WalletCore")
         }
@@ -45,7 +50,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("com.trustwallet:wallet-core-kotlin:4.0.28")
+                implementation("com.trustwallet:wallet-core-kotlin:+")
             }
         }
         val commonTest by getting {
@@ -87,9 +92,8 @@ kotlin {
 
 android {
     namespace = "com.example.kmpsample"
-    compileSdk = 33
+    compileSdk = 35
     defaultConfig {
         minSdk = 24
-        targetSdk = 33
     }
 }

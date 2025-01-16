@@ -9,7 +9,13 @@ use crate::instruction::Instruction;
 use crate::transaction::MessageHeader;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use tw_coin_entry::error::{SigningError, SigningErrorType, SigningResult};
+use tw_coin_entry::error::prelude::*;
+
+pub fn try_into_u8(num: usize) -> SigningResult<u8> {
+    u8::try_from(num)
+        .tw_err(|_| SigningErrorType::Error_tx_too_big)
+        .context("There are too many accounts in the transaction")
+}
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 struct CompiledKeyMeta {
@@ -67,10 +73,6 @@ impl CompiledKeys {
     }
 
     pub fn try_into_message_components(self) -> SigningResult<(MessageHeader, Vec<SolanaAddress>)> {
-        let try_into_u8 = |num: usize| -> SigningResult<u8> {
-            u8::try_from(num).map_err(|_| SigningError(SigningErrorType::Error_tx_too_big))
-        };
-
         let Self {
             ordered_keys,
             key_meta_map,
@@ -103,9 +105,12 @@ impl CompiledKeys {
             .saturating_add(readonly_signer_keys.len());
 
         let header = MessageHeader {
-            num_required_signatures: try_into_u8(signers_len)?,
-            num_readonly_signed_accounts: try_into_u8(readonly_signer_keys.len())?,
-            num_readonly_unsigned_accounts: try_into_u8(readonly_non_signer_keys.len())?,
+            num_required_signatures: try_into_u8(signers_len)
+                .context("Too many signatures required")?,
+            num_readonly_signed_accounts: try_into_u8(readonly_signer_keys.len())
+                .context("Too many accounts in the transaction")?,
+            num_readonly_unsigned_accounts: try_into_u8(readonly_non_signer_keys.len())
+                .context("Too many accounts in the transaction")?,
         };
 
         let static_account_keys: Vec<_> = std::iter::empty()

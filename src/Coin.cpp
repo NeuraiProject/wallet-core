@@ -66,6 +66,8 @@
 #include "InternetComputer/Entry.h"
 #include "NativeEvmos/Entry.h"
 #include "NativeInjective/Entry.h"
+#include "BitcoinCash/Entry.h"
+#include "Pactus/Entry.h"
 // end_of_coin_includes_marker_do_not_modify
 
 using namespace TW;
@@ -125,6 +127,8 @@ Greenfield::Entry GreenfieldDP;
 InternetComputer::Entry InternetComputerDP;
 NativeEvmos::Entry NativeEvmosDP;
 NativeInjective::Entry NativeInjectiveDP;
+BitcoinCash::Entry BitcoinCashDP;
+Pactus::Entry PactusDP;
 // end_of_coin_dipatcher_declarations_marker_do_not_modify
 
 CoinEntry* coinDispatcher(TWCoinType coinType) {
@@ -186,6 +190,8 @@ CoinEntry* coinDispatcher(TWCoinType coinType) {
         case TWBlockchainInternetComputer: entry = &InternetComputerDP; break;
         case TWBlockchainNativeEvmos: entry = &NativeEvmosDP; break;
         case TWBlockchainNativeInjective: entry = &NativeInjectiveDP; break;
+        case TWBlockchainBitcoinCash: entry = &BitcoinCashDP; break;
+        case TWBlockchainPactus: entry = &PactusDP; break;
         // end_of_coin_dipatcher_switch_marker_do_not_modify
 
         default: entry = nullptr; break;
@@ -210,7 +216,11 @@ bool TW::validateAddress(TWCoinType coin, const string& address, const PrefixVar
     // dispatch
     auto* dispatcher = coinDispatcher(coin);
     assert(dispatcher != nullptr);
-    return dispatcher->validateAddress(coin, address, prefix);
+    try {
+        return dispatcher->validateAddress(coin, address, prefix);
+    } catch (...) {
+        return false;
+    }
 }
 
 bool TW::validateAddress(TWCoinType coin, const std::string& string) {
@@ -221,20 +231,25 @@ bool TW::validateAddress(TWCoinType coin, const std::string& string) {
     // dispatch
     auto* dispatcher = coinDispatcher(coin);
     assert(dispatcher != nullptr);
-    bool isValid = false;
-    // First check HRP.
-    if (hrp != nullptr && !std::string(hrp).empty()) {
-        isValid = dispatcher->validateAddress(coin, string, Bech32Prefix(hrp));
+
+    try {
+        bool isValid = false;
+        // First check HRP.
+        if (hrp != nullptr && !std::string(hrp).empty()) {
+            isValid = dispatcher->validateAddress(coin, string, Bech32Prefix(hrp));
+        }
+        // Then check UTXO
+        if ((p2pkh != 0 || p2sh != 0) && !isValid) {
+            return isValid || dispatcher->validateAddress(coin, string, Base58Prefix{.p2pkh = p2pkh, .p2sh = p2sh});
+        }
+        // Then check normal
+        if (!isValid) {
+            isValid = dispatcher->validateAddress(coin, string, std::monostate());
+        }
+        return isValid;
+    } catch (...) {
+        return false;
     }
-    // Then check UTXO
-    if ((p2pkh != 0 || p2sh != 0) && !isValid) {
-        return isValid || dispatcher->validateAddress(coin, string, Base58Prefix{.p2pkh = p2pkh, .p2sh = p2sh});
-    }
-    // Then check normal
-    if (!isValid) {
-        isValid = dispatcher->validateAddress(coin, string, std::monostate());
-    }
-    return isValid;
 }
 
 namespace TW::internal {

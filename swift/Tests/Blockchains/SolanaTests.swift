@@ -290,4 +290,104 @@ class SolanaTests: XCTestCase {
         let expected = "AQPWaOi7dMdmQpXi8HyQQKwiqIftrg1igGQxGtZeT50ksn4wAnyH4DtDrkkuE0fqgx80LTp4LwNN9a440SrmoA8BAAEDZsL1CMnFVcrMn7JtiOiN1U4hC7WovOVof2DX51xM0H/GizyJTHgrBanCf8bGbrFNTn0x3pCGq30hKbywSTr6AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAgIAAQwCAAAAKgAAAAAAAAA="
         XCTAssertEqual(output.encoded, expected)
     }
+    
+    func testSetPriorityFee() throws {
+        let privateKey = Data(hexString: "baf2b2dbbbad7ca96c1fa199c686f3d8fbd2c7b352f307e37e04f33df6741f18")!
+        let originalTx = "AX43+Ir2EDqf2zLEvgzFrCZKRjdr3wCdp8CnvYh6N0G/s86IueX9BbiNUl16iLRGvwREDfi2Srb0hmLNBFw1BwABAAEDODI+iWe7g68B9iwCy8bFkJKvsIEj350oSOpcv4gNnv/st+6qmqipl9lwMK6toB9TiL7LrJVfij+pKwr+pUKxfwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAG6GdPcA92ORzVJe2jfG8KQqqMHr9YTLu30oM4i7MFEoBAgIAAQwCAAAA6AMAAAAAAAA="
+
+        // Step 1 - Check if there are no price and limit instructions in the original transaction.
+        XCTAssertEqual(SolanaTransaction.getComputeUnitPrice(encodedTx: originalTx), nil)
+        XCTAssertEqual(SolanaTransaction.getComputeUnitLimit(encodedTx: originalTx), nil)
+
+        // Step 2 - Set price and limit instructions.
+        let txWithPrice = SolanaTransaction.setComputeUnitPrice(encodedTx: originalTx, price: "1000")!
+        let updatedTx = SolanaTransaction.setComputeUnitLimit(encodedTx: txWithPrice, limit: "10000")!
+
+        XCTAssertEqual(updatedTx, "AX43+Ir2EDqf2zLEvgzFrCZKRjdr3wCdp8CnvYh6N0G/s86IueX9BbiNUl16iLRGvwREDfi2Srb0hmLNBFw1BwABAAIEODI+iWe7g68B9iwCy8bFkJKvsIEj350oSOpcv4gNnv/st+6qmqipl9lwMK6toB9TiL7LrJVfij+pKwr+pUKxfwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwZGb+UhFzL/7K26csOb57yM5bvF9xJrLEObOkAAAAAboZ09wD3Y5HNUl7aN8bwpCqowev1hMu7fSgziLswUSgMDAAUCECcAAAICAAEMAgAAAOgDAAAAAAAAAwAJA+gDAAAAAAAA")
+
+        // Step 3 - Check if price and limit instructions are set successfully.
+        XCTAssertEqual(SolanaTransaction.getComputeUnitPrice(encodedTx: updatedTx), "1000")
+        XCTAssertEqual(SolanaTransaction.getComputeUnitLimit(encodedTx: updatedTx), "10000")
+
+        // Step 4 - Decode transaction into a `RawMessage` Protobuf.
+        let updatedTxData = Base64.decode(string: updatedTx)!
+        let decodeOutputData = TransactionDecoder.decode(coinType: .solana, encodedTx: updatedTxData)
+        var decodeOutput = try SolanaDecodingTransactionOutput(serializedData: decodeOutputData)
+
+        XCTAssertEqual(decodeOutput.error, .ok)
+
+        // Step 5 - Sign the decoded `RawMessage` transaction.
+        let signingInput = SolanaSigningInput.with {
+            $0.privateKey = privateKey
+            $0.rawMessage = decodeOutput.transaction
+            $0.txEncoding = .base64
+        }
+
+        let output: SolanaSigningOutput = AnySigner.sign(input: signingInput, coin: .solana)
+        XCTAssertEqual(output.error, .ok)
+        // Successfully broadcasted tx:
+        // https://explorer.solana.com/tx/2ho7wZUXbDNz12xGfsXg2kcNMqkBAQjv7YNXNcVcuCmbC4p9FZe9ELeM2gMjq9MKQPpmE3nBW5pbdgwVCfNLr1h8
+        XCTAssertEqual(output.encoded, "AVUye82Mv+/aWeU2G+B6Nes365mUU2m8iqcGZn/8kFJvw4wY6AgKGG+vJHaknHlCDwE1yi1SIMVUUtNCOm3kHg8BAAIEODI+iWe7g68B9iwCy8bFkJKvsIEj350oSOpcv4gNnv/st+6qmqipl9lwMK6toB9TiL7LrJVfij+pKwr+pUKxfwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwZGb+UhFzL/7K26csOb57yM5bvF9xJrLEObOkAAAAAboZ09wD3Y5HNUl7aN8bwpCqowev1hMu7fSgziLswUSgMDAAUCECcAAAICAAEMAgAAAOgDAAAAAAAAAwAJA+gDAAAAAAAA")
+    }
+
+    func testSetFeePayer() throws {
+        // base64 encoded
+        let originalTx = "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQABA2uEKrOPvZNBtdUtSFXcg8+kj4O/Z1Ht/hwvnaqq5s6mTXd3KtwUyJFfRs2PBfeQW8xCEZvNr/5J/Tx8ltbn0pwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACo+QRbvXWNKoOfaOL4cSpfYrmn/2TV+dBmct+HsmmwdAQICAAEMAgAAAACcnwYAAAAAAA=="
+
+        // Step 1 - Add fee payer to the transaction.
+        let updatedTx = SolanaTransaction.setFeePayer(encodedTx: originalTx, feePayer: "Eg5jqooyG6ySaXKbQUu4Lpvu2SqUPZrNkM4zXs9iUDLJ")!
+
+        XCTAssertEqual(updatedTx, "AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAIAAQTLKvCJtWpVdze8Fxjgy/Iyz1sC4U7gqnxmdSM/X2+bV2uEKrOPvZNBtdUtSFXcg8+kj4O/Z1Ht/hwvnaqq5s6mTXd3KtwUyJFfRs2PBfeQW8xCEZvNr/5J/Tx8ltbn0pwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACo+QRbvXWNKoOfaOL4cSpfYrmn/2TV+dBmct+HsmmwdAQMCAQIMAgAAAACcnwYAAAAAAA==")
+
+        // Step 2 - Decode transaction into a `RawMessage` Protobuf.
+        let updatedTxData = Base64.decode(string: updatedTx)!
+        let decodeOutputData = TransactionDecoder.decode(coinType: .solana, encodedTx: updatedTxData)
+        let decodeOutput = try SolanaDecodingTransactionOutput(serializedData: decodeOutputData)
+
+        XCTAssertEqual(decodeOutput.error, .ok)
+
+        // Step 3 - Obtain preimage hash.
+        let signingInput = SolanaSigningInput.with {
+            $0.rawMessage = decodeOutput.transaction
+            $0.txEncoding = .base64
+        }
+        let txInputData = try signingInput.serializedData() // Serialize input
+        let preImageHashes = TransactionCompiler.preImageHashes(coinType: .solana, txInputData: txInputData)
+        let preSigningOutput: SolanaPreSigningOutput = try SolanaPreSigningOutput(serializedData: preImageHashes)
+        XCTAssertEqual(preSigningOutput.error, CommonSigningError.ok)
+        XCTAssertEqual(preSigningOutput.data.hexString, "8002000104cb2af089b56a557737bc1718e0cbf232cf5b02e14ee0aa7c6675233f5f6f9b576b842ab38fbd9341b5d52d4855dc83cfa48f83bf6751edfe1c2f9daaaae6cea64d77772adc14c8915f46cd8f05f7905bcc42119bcdaffe49fd3c7c96d6e7d29c00000000000000000000000000000000000000000000000000000000000000002a3e4116ef5d634aa0e7da38be1c4a97d8ae69ffd9357e74199cb7e1ec9a6c1d01030201020c02000000009c9f060000000000")
+
+        // Step 4 - Compile transaction info.
+        // Simulate signature, normally obtained from signature server.
+        let signatureVec = DataVector()
+        let pubkeyVec = DataVector()
+        let feePayerSignature = Data(hexString: "feb9f15cc345fa156450676100033860edbe80a6f61dab8199e94fdc47678ecfdb95e3bc10ec0a7f863ab8ef5c38edae72db7e5d72855db225fd935fd59b700a")!
+        let feePayerPublicKey = Data(hexString: "cb2af089b56a557737bc1718e0cbf232cf5b02e14ee0aa7c6675233f5f6f9b57")!
+        signatureVec.add(data: feePayerSignature)
+        pubkeyVec.add(data: feePayerPublicKey)
+        let solSenderSignature = Data(hexString: "936cd6d176e701d1f748031925b2f029f6f1ab4b99aec76e24ccf05649ec269569a08ec0bd80f5fee1cb8d13ecd420bf50c5f64ae74c7afa267458cabb4e5804")!
+        let solSenderPublicKey = Data(hexString: "6b842ab38fbd9341b5d52d4855dc83cfa48f83bf6751edfe1c2f9daaaae6cea6")!
+        signatureVec.add(data: solSenderSignature)
+        pubkeyVec.add(data: solSenderPublicKey)
+
+        let compileWithSignatures = TransactionCompiler.compileWithSignatures(coinType: .solana, txInputData: txInputData, signatures: signatureVec, publicKeys: pubkeyVec)
+        let expectedTx = "Av658VzDRfoVZFBnYQADOGDtvoCm9h2rgZnpT9xHZ47P25XjvBDsCn+GOrjvXDjtrnLbfl1yhV2yJf2TX9WbcAqTbNbRducB0fdIAxklsvAp9vGrS5mux24kzPBWSewmlWmgjsC9gPX+4cuNE+zUIL9QxfZK50x6+iZ0WMq7TlgEgAIAAQTLKvCJtWpVdze8Fxjgy/Iyz1sC4U7gqnxmdSM/X2+bV2uEKrOPvZNBtdUtSFXcg8+kj4O/Z1Ht/hwvnaqq5s6mTXd3KtwUyJFfRs2PBfeQW8xCEZvNr/5J/Tx8ltbn0pwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACo+QRbvXWNKoOfaOL4cSpfYrmn/2TV+dBmct+HsmmwdAQMCAQIMAgAAAACcnwYAAAAAAA=="
+        let output: SolanaSigningOutput = try SolanaSigningOutput(serializedData: compileWithSignatures)
+        XCTAssertEqual(output.encoded, expectedTx)
+        // Successfully broadcasted tx:
+        // https://explorer.solana.com/tx/66PAVjxFVGP4ctrkXmyNRhp6BdFT7gDe1k356DZzCRaBDTmJZF1ewGsbujWRjDTrt5utnz8oHZw3mg8qBNyct41w?cluster=devnet
+    }
+    
+    func testSignUserMessage() throws {
+        let privateKey = Data(hexString: "44f480ca27711895586074a14c552e58cc52e66a58edb6c58cf9b9b7295d4a2d")!
+
+        let input = SolanaMessageSigningInput.with {
+            $0.privateKey = privateKey
+            $0.message = "Hello world"
+        }
+        let outputData = MessageSigner.sign(coin: .solana, input: try input.serializedData())!
+        let output = try SolanaMessageSigningOutput(serializedData: outputData)
+        XCTAssertEqual(output.error, .ok)
+        XCTAssertEqual(output.signature, "2iBZ6zrQRKHcbD8NWmm552gU5vGvh1dk3XV4jxnyEdRKm8up8AeQk1GFr9pJokSmchw7i9gMtNyFBdDt8tBxM1cG")
+    }
 }

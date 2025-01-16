@@ -13,7 +13,7 @@ concurrency:
 jobs:
   build:
     if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.fork == false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
 
@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: build/local
-          key: ${{ runner.os }}-internal-${{ hashFiles('tools/install-dependencies') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-internal-${{ hashFiles('tools/install-dependencies') }}-${{ hashFiles('tools/dependencies-version') }}
 
       - name: Install internal dependencies
         run: |

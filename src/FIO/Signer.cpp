@@ -23,9 +23,11 @@ using namespace std;
 
 Proto::SigningOutput Signer::sign(const Proto::SigningInput& input) noexcept {
     FIO::Proto::SigningOutput output;
-    try {    
+    try {
+        const string actionName = TransactionBuilder::actionName(input);
         const string json = TransactionBuilder::sign(input);
         output.set_json(json);
+        output.set_action_name(actionName);
     } catch(const std::exception& e) {
         output.set_error(Common::Proto::Error_internal);
     }
@@ -59,7 +61,7 @@ bool Signer::verify(const PublicKey& pubKey, const Data& data, const Data& signa
     return pubKey.verify(TW::data(signature.data() + 1, signature.size() - 1), data);
 }
 
-// canonical check for FIO, both R and S lenght is 32
+// canonical check for FIO, both R and S length is 32
 int Signer::isCanonical([[maybe_unused]] uint8_t by, uint8_t sig[64]) {
     return !(sig[0] & 0x80)
         && !(sig[0] == 0 && !(sig[1] & 0x80))

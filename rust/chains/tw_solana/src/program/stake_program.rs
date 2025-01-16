@@ -5,7 +5,7 @@
 use crate::address::SolanaAddress;
 use crate::blockhash::Blockhash;
 use crate::defined_addresses::*;
-use tw_coin_entry::error::{AddressError, AddressResult};
+use tw_coin_entry::error::prelude::*;
 use tw_hash::sha2::sha256;
 use tw_hash::H256;
 
@@ -37,12 +37,13 @@ impl StakeProgram {
     /// https://github.com/solana-labs/solana-program-library/blob/master/associated-token-account/program/src/lib.rs#L35
     pub fn get_associated_token_address(
         main_address: SolanaAddress,
+        token_program_id: SolanaAddress,
         token_mint_address: SolanaAddress,
     ) -> AddressResult<SolanaAddress> {
         SolanaAddress::find_program_address(
             &[
                 main_address.bytes().as_slice(),
-                TOKEN_PROGRAM_ID_ADDRESS.bytes().as_slice(),
+                token_program_id.bytes().as_slice(),
                 token_mint_address.bytes().as_slice(),
             ],
             *ASSOCIATED_TOKEN_PROGRAM_ID_ADDRESS,

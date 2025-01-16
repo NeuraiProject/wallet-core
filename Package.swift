@@ -12,13 +12,13 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "WalletCore",
-            url: "https://github.com/trustwallet/wallet-core/releases/download/3.2.1/WalletCore.xcframework.zip",
-            checksum: "b7f9fe6b5aa1fd216d43f676400c9db6999c6494e0120db73b2afb49dcc1f013"
+            url: "https://github.com/trustwallet/wallet-core/releases/download/4.1.21/WalletCore.xcframework.zip",
+            checksum: "503937e1013bb7c1f610a8a4ec74a6ccdedb06bdec9fa9126ac47e25a90da06a"
         ),
         .binaryTarget(
             name: "SwiftProtobuf",
-            url: "https://github.com/trustwallet/wallet-core/releases/download/3.2.1/SwiftProtobuf.xcframework.zip",
-            checksum: "12bbc92dc2225c661e301cc2826e034fcb69b2a144f8c4ff2e51ce6ccf122124"
+            url: "https://github.com/trustwallet/wallet-core/releases/download/4.1.21/SwiftProtobuf.xcframework.zip",
+            checksum: "f6da2b8fafdce5e8d46ea305972f1ad942cc796f63026a32c883331dd3813285"
         )
     ]
 )

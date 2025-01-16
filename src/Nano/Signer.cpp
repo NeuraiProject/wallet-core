@@ -5,16 +5,15 @@
 
 #include "Signer.h"
 #include "../BinaryCoding.h"
-#include "../Hash.h"
 #include "../HexCoding.h"
-#include <nlohmann/json.hpp>
+#include "../uint256.h"
 
-#include <boost/multiprecision/cpp_int.hpp>
+#include <algorithm>
+#include <nlohmann/json.hpp>
 #include <google/protobuf/util/json_util.h>
 
 using namespace TW;
 
-using uint128_t = boost::multiprecision::uint128_t;
 using json = nlohmann::json;
 
 namespace TW::Nano {
@@ -27,8 +26,6 @@ const std::array<byte, 32> kBlockHashPreamble{
 };
 
 std::array<byte, 16> store(const uint128_t& value) {
-    using boost::multiprecision::cpp_int;
-
     Data buf;
     buf.reserve(16);
     export_bits(value, std::back_inserter(buf), 8);

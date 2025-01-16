@@ -8,12 +8,12 @@ use crate::modules::proto_builder::ProtoBuilder;
 use crate::modules::tx_signer::TxSigner;
 use crate::SOLANA_ALPHABET;
 use std::borrow::Cow;
-use std::collections::HashMap;
 use tw_coin_entry::coin_context::CoinContext;
 use tw_coin_entry::coin_entry::{PublicKeyBytes, SignatureBytes};
-use tw_coin_entry::error::{SigningError, SigningErrorType, SigningResult};
+use tw_coin_entry::error::prelude::*;
 use tw_coin_entry::signing_output_error;
-use tw_encoding::{base58, base64};
+use tw_encoding::base58;
+use tw_encoding::base64::{self, STANDARD};
 use tw_keypair::ed25519;
 use tw_keypair::traits::VerifyingKeyTrait;
 use tw_proto::Solana::Proto;
@@ -68,26 +68,32 @@ impl SolanaCompiler {
         public_keys: Vec<PublicKeyBytes>,
     ) -> SigningResult<Proto::SigningOutput<'static>> {
         let encode = move |data| match input.tx_encoding {
-            Proto::Encoding::Base58 => base58::encode(data, &SOLANA_ALPHABET),
-            Proto::Encoding::Base64 => base64::encode(data, false),
+            Proto::Encoding::Base58 => base58::encode(data, SOLANA_ALPHABET),
+            Proto::Encoding::Base64 => base64::encode(data, STANDARD),
         };
 
         if signatures.len() != public_keys.len() {
-            return Err(SigningError(SigningErrorType::Error_signatures_count));
+            return SigningError::err(SigningErrorType::Error_signatures_count)
+                .context("Expected the same number of signatures and public keys");
         }
 
         let builder = MessageBuilder::new(input);
+        // `key_signs` is pre-initialized with external signatures present in the raw transaction already.
+        // Later, this will be extended with the `signatures` provided by the user.
+        let mut key_signs = builder.external_signatures()?;
         let unsigned_msg = builder.build()?;
         let data_to_sign = TxSigner::preimage_versioned(&unsigned_msg)?;
 
         // Verify the given signatures and collect the key-signature map.
-        let mut key_signs = HashMap::default();
         for (sign, pubkey) in signatures.iter().zip(public_keys.iter()) {
             let signature = ed25519::Signature::try_from(sign.as_slice())?;
             let pubkey = ed25519::sha512::PublicKey::try_from(pubkey.as_slice())?;
 
-            if !pubkey.verify(signature.clone(), data_to_sign.clone()) {
-                return Err(SigningError(SigningErrorType::Error_signing));
+            if !pubkey.verify(signature.clone(), data_to_sign.clone())
+                && !signature.to_bytes().is_zero()
+            {
+                return SigningError::err(SigningErrorType::Error_signing)
+                    .context("Error verifying the given signature");
             }
 
             key_signs.insert(SolanaAddress::with_public_key_ed25519(&pubkey), signature);
@@ -96,7 +102,8 @@ impl SolanaCompiler {
         let signed_tx = TxSigner::compile_versioned(unsigned_msg, key_signs)?;
 
         let signed_encoded = bincode::serialize(&signed_tx)
-            .map_err(|_| SigningError(SigningErrorType::Error_internal))?;
+            .tw_err(|_| SigningErrorType::Error_internal)
+            .context("Error serializing signed transaction")?;
         let signed_encoded = encode(&signed_encoded);
         let unsigned_encoded = encode(&data_to_sign);
 

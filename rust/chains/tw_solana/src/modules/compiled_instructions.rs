@@ -5,7 +5,7 @@
 use crate::address::SolanaAddress;
 use crate::instruction::Instruction;
 use crate::transaction::CompiledInstruction;
-use tw_coin_entry::error::{SigningError, SigningErrorType, SigningResult};
+use tw_coin_entry::error::prelude::*;
 
 pub fn compile_instructions(
     ixs: &[Instruction],
@@ -18,7 +18,7 @@ fn position(keys: &[SolanaAddress], key: &SolanaAddress) -> SigningResult<u8> {
     keys.iter()
         .position(|k| k == key)
         .map(|k| k as u8)
-        .ok_or(SigningError(SigningErrorType::Error_internal))
+        .or_tw_err(SigningErrorType::Error_internal)
 }
 
 /// https://github.com/solana-labs/solana/blob/4b65cc8eef6ef79cb9b9cbc534a99b4900e58cf7/sdk/program/src/message/legacy.rs#L72-L84
@@ -30,10 +30,12 @@ pub(crate) fn compile_instruction(
         .accounts
         .iter()
         .map(|account_meta| position(keys, &account_meta.pubkey))
-        .collect::<SigningResult<Vec<_>>>()?;
+        .collect::<SigningResult<Vec<_>>>()
+        .context("Cannot build account metas")?;
 
     Ok(CompiledInstruction {
-        program_id_index: position(keys, &ix.program_id)?,
+        program_id_index: position(keys, &ix.program_id)
+            .context("Program ID account is not provided")?,
         data: ix.data.clone(),
         accounts,
     })
@@ -52,7 +54,7 @@ mod tests {
     fn test_compile_instruction() {
         let public_0 = base58::decode(
             "GymAh18wHuFTytfSJWi8eYTA9x5S3sNb9CJSGBWoPRE3",
-            &SOLANA_ALPHABET,
+            SOLANA_ALPHABET,
         )
         .unwrap();
         let public_0 = ed25519::sha512::PublicKey::try_from(public_0.as_slice()).unwrap();
@@ -60,7 +62,7 @@ mod tests {
 
         let public_1 = base58::decode(
             "2oKoYSAHgveX91917v4DUEuN8BNKXDg8KJWpaGyEay9V",
-            &SOLANA_ALPHABET,
+            SOLANA_ALPHABET,
         )
         .unwrap();
         let public_1 = ed25519::sha512::PublicKey::try_from(public_1.as_slice()).unwrap();
